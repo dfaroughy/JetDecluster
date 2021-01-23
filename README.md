@@ -1,2 +1,2 @@
 # pysubjet
-A python code for jet substructure jet declustering trees.
+A python code for jet substructure and jet declustering trees.
