@@ -6,60 +6,10 @@ import pandas as pd
 from random import randrange,shuffle
 from timeit import default_timer as timer
 import os
-# from functions import *
-# from basic_functions import *
 import networkx as nx
 from networkx.drawing.nx_agraph import write_dot, graphviz_layout
 from scipy.linalg import block_diag
 
-
-
-class cluster_events(object):
-
-    def __init__(self, 
-                 data,
-                 cluster_algorithm='anti_kt', 
-                 R=1.0, 
-                 ptmin=0.0,
-                 stop=None
-                 ):
-        
-        self.data=data
-        self.cluster_algorithm=cluster_algorithm
-        self.R=R
-        self.ptmin=ptmin
-        self.stop=stop
-        
-    def __enter__(self):
-        num_const=self.data.shape[1]/3
-        truth_flag=False
-        if not (num_const)%1==0:
-            truth_flag=True
-        for N,event in self.data.iterrows():
-            if truth_flag:
-                truth_label=event[self.data.shape[1]-1]
-            pseudojets=np.zeros(int(num_const)*3, dtype=DTYPE_PTEPM)
-            cut=int(num_const)
-            for j in range(int(num_const)):
-                if event[j*3]==0.0:
-                    cut=j
-                    break
-                pseudojets[j]['pT' ] = event[j*3]
-                pseudojets[j]['eta'] = event[j*3+1]
-                pseudojets[j]['phi'] = event[j*3+2]
-            #...cluster jets:  
-            pseudojets = np.sort(pseudojets[:cut], order='pT')
-            sequence = cluster(pseudojets, R=self.R, p=exponent(self.cluster_algorithm))
-            jets = sequence.inclusive_jets(ptmin=self.ptmin)
-            label = truth_label
-            yield N, jets, label
-            
-            if N+1==self.stop: break
-            
-    def __exit__(self, exc_type, exc_value, traceback):
-        pass
-
-    
     
 def decluster_jet(jets, 
                   node_feature=None, 
@@ -134,6 +84,53 @@ def decluster_jet(jets,
         for n,jet in enumerate(jet_trees): jet.nodes(data=True)[1]['j']=n  # update Njet label to match ordering
             
     return jet_trees
+
+
+class cluster_events(object):
+
+    def __init__(self, 
+                 data,
+                 cluster_algorithm='anti_kt', 
+                 R=1.0, 
+                 ptmin=0.0,
+                 stop=None
+                 ):
+        
+        self.data=data
+        self.cluster_algorithm=cluster_algorithm
+        self.R=R
+        self.ptmin=ptmin
+        self.stop=stop
+        
+    def __enter__(self):
+        num_const=self.data.shape[1]/3
+        truth_flag=False
+        if not (num_const)%1==0:
+            truth_flag=True
+        for N,event in self.data.iterrows():
+            if truth_flag:
+                truth_label=event[self.data.shape[1]-1]
+            pseudojets=np.zeros(int(num_const)*3, dtype=DTYPE_PTEPM)
+            cut=int(num_const)
+            for j in range(int(num_const)):
+                if event[j*3]==0.0:
+                    cut=j
+                    break
+                pseudojets[j]['pT' ] = event[j*3]
+                pseudojets[j]['eta'] = event[j*3+1]
+                pseudojets[j]['phi'] = event[j*3+2]
+            #...cluster jets:  
+            pseudojets = np.sort(pseudojets[:cut], order='pT')
+            sequence = cluster(pseudojets, R=self.R, p=exponent(self.cluster_algorithm))
+            jets = sequence.inclusive_jets(ptmin=self.ptmin)
+            label = truth_label
+            yield N, jets, label
+            
+            if N+1==self.stop: break
+            
+    def __exit__(self, exc_type, exc_value, traceback):
+        pass
+
 
 
 def draw_event_trees(G,cmap=plt.cm.viridis_r):
