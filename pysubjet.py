@@ -16,7 +16,41 @@ from numpy.lib.recfunctions import append_fields
 plt.style.use(hep.style.ROOT) # For now ROOT defaults to CMS
 
 
-def decluster(jet,jet_label=None,node_feature=None,node_label=None,R=1.0, directed=False):
+class get_particles(object):
+    def __init__(self,data,stop=None, dtype='EP'):
+        self.dtype=dtype
+        self.data=data
+        self.stop=stop
+    def __enter__(self):
+        
+            # TODO: add hdf5 input type            
+            line = HepMCReader(self.data)
+            Nev=0
+            while True:
+                Nev+=1
+                evt = line.next()
+                if not evt:
+                    break 
+                final_states=[evt.particles[p][1:] for p in evt.particles if evt.particles[p][0]==1] # extracts only final state particles
+                pseudojets=np.zeros(len(final_states),dtype=DTYPE_EP) 
+                pseudojets=append_fields(pseudojets, 'pid', data=np.zeros(len(final_states)))
+                for j,p in enumerate(final_states): # this is too slow.... need to optimize
+                    pseudojets[j]['px']=p[1]
+                    pseudojets[j]['py']=p[2]
+                    pseudojets[j]['pz']=p[3]
+                    pseudojets[j]['E']=p[4]
+                    pseudojets[j]['pid']=p[0]
+                if self.dtype=='EP':
+                    yield pseudojets
+                elif self.dtype=='PTEPM':
+                    yield ep2ptepm_pid(pseudojets)
+                if Nev==self.stop:
+                    break
+    def __exit__(self, exc_type, exc_value, traceback):
+        pass 
+
+
+def decluster(jet,jet_label=None,node_feature=None,node_label=None,R=1.0,p=0,directed=False):
         
     '''
     Reclusters constituents of a jets then extracts then de-clusteres to recover 
@@ -54,7 +88,7 @@ def decluster(jet,jet_label=None,node_feature=None,node_label=None,R=1.0, direct
             pseudojets[i]['phi']=j.phi
             pseudojets[i]['mass']=j.mass
             
-        clustered_jet = cluster(pseudojets, R=R, p=0)
+        clustered_jet = cluster(pseudojets, R=R, p=p)
         
         # define jet tree (as a netwrokx directed or undirected graph):
         
@@ -118,41 +152,6 @@ def decluster(jet,jet_label=None,node_feature=None,node_label=None,R=1.0, direct
         return jet_tree
     else:
         return None
-
-
-
-class get_particles(object):
-    def __init__(self,data,stop=None, dtype='EP'):
-        self.dtype=dtype
-        self.data=data
-        self.stop=stop
-    def __enter__(self):
-        
-            # TODO: add hdf5 input type            
-            line = HepMCReader(self.data)
-            Nev=0
-            while True:
-                Nev+=1
-                evt = line.next()
-                if not evt:
-                    break 
-                final_states=[evt.particles[p][1:] for p in evt.particles if evt.particles[p][0]==1] # extracts only final state particles
-                pseudojets=np.zeros(len(final_states),dtype=DTYPE_EP) 
-                pseudojets=append_fields(pseudojets, 'pid', data=np.zeros(len(final_states)))
-                for j,p in enumerate(final_states): # this is too slow.... need to optimize
-                    pseudojets[j]['px']=p[1]
-                    pseudojets[j]['py']=p[2]
-                    pseudojets[j]['pz']=p[3]
-                    pseudojets[j]['E']=p[4]
-                    pseudojets[j]['pid']=p[0]
-                if self.dtype=='EP':
-                    yield pseudojets
-                elif self.dtype=='PTEPM':
-                    yield ep2ptepm_pid(pseudojets)
-                if Nev==self.stop:
-                    break
-    def __exit__(self, exc_type, exc_value, traceback):
-        pass 
 
 
 class cluster_events(object):
@@ -319,8 +318,6 @@ def draw_trees(G,cmap=plt.cm.viridis_r, jet_label=False):
 
         
         
-        
-        
 ################################################          
 # from Python module pyhepmc 1.0.3 
 
@@ -467,74 +464,3 @@ def inv_M(jet1,jet2):
     e  = jet1.e  + jet2.e
     return np.sqrt(e**2 - px**2 - py**2 - pz**2)
 
-
-
-
-
-
-
-
-
-# class get_particles(object):
-#     def __init__(self,data,stop=None,dtype='EP'):
-#         self.dtype=dtype
-#         self.data=data
-#         self.stop=stop
-#         if isinstance(data,pd.DataFrame):
-#             self.pandas=True
-#         else:
-#             self.pandas=False
-#     def __enter__(self):
-        
-#         if self.pandas:
-#             num_const=self.data.shape[1]/3
-#             truth_flag=False
-#             if not (num_const)%1==0:
-#                 truth_flag=True
-#             for N,event in self.data.iterrows():
-#                 if truth_flag:
-#                     truth_label=event[self.data.shape[1]-1]
-#                 pseudojets=np.zeros(int(num_const)*3, dtype=DTYPE_PTEPM)
-#                 pseudojets=append_fields(pseudojets, 'pid', data=np.zeros(int(num_const)*3))
-#                 cut=int(num_const)
-#                 for j in range(int(num_const)):
-#                     if event[j*3]==0.0:
-#                         cut=j
-#                         break
-#                     pseudojets[j]['pT' ] = event[j*3]
-#                     pseudojets[j]['eta'] = event[j*3+1]
-#                     pseudojets[j]['phi'] = event[j*3+2]
-#                     pseudojets[j]['pid'] = truth_label
-#                 #...cluster jets:  
-#                 yield pseudojets
-#                 if N+1==self.stop: 
-#                     break
-#         else:
-#             # TODO: add hdf5 input type            
-#             line = HepMCReader(self.data)
-#             Nev=0
-#             while True:
-#                 Nev+=1
-#                 evt = line.next()
-#                 if not evt:
-#                     break 
-#                 final_states=[evt.particles[p][1:] for p in evt.particles if evt.particles[p][0]==1] # extracts only final state particles
-#                 pseudojets=np.zeros(len(final_states),dtype=DTYPE_EP) 
-#                 pseudojets=append_fields(pseudojets, 'pid', data=np.zeros(len(final_states)))
-#                 for j,p in enumerate(final_states): # this is too slow.... need to optimize
-#                     pseudojets[j]['px']=p[1]
-#                     pseudojets[j]['py']=p[2]
-#                     pseudojets[j]['pz']=p[3]
-#                     pseudojets[j]['E']=p[4]
-#                     pseudojets[j]['pid']=p[0]
-#                 if self.dtype=='EP':
-#                     yield pseudojets
-#                 elif self.dtype=='PTEPM':
-#                     yield ep2ptepm_pid(pseudojets)
-#                 if Nev==self.stop:
-#                     break
-#     def __exit__(self, exc_type, exc_value, traceback):
-#         pass 
-
-
-    
