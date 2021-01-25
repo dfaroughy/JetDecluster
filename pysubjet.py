@@ -306,20 +306,19 @@ def draw_jet_tree(G,edge_weight='weight',cmap=plt.cm.viridis_r):
     nx.draw(G, pos=pos,node_size=5,node_color='k',edge_color=edge_color,width=2,edge_cmap=cmap)
     plt.show()
 
-def draw_trees(G,cmap=plt.cm.viridis_r):
+def draw_trees(G,cmap=plt.cm.viridis_r, jet_label=False):
     plt.figure(figsize=(4*len(G),4), constrained_layout=True)
     for n,g in enumerate(G):
         plt.subplot(int(str(1)+str(len(G))+str(n+1)))
         pos = hierarchy_pos(g,1) 
         edge_color = nx.get_edge_attributes(g,'weight').values()
-        node_size=[]
-        for n in g.nodes(data=True):
-            if len(n[1])==0:
-                node_size.append(0)
-            else:
-                node_size.append(4)
-        nx.draw(g,pos=pos,node_size=node_size,node_color='k',alpha=1.0,edge_color=edge_color,width=2,edge_cmap=cmap)
+        jl = nx.get_node_attributes(g,'jet_label')
+        nx.draw(g,pos=pos,node_size=4,node_color='k',alpha=1.0,edge_color=edge_color,width=2,edge_cmap=cmap)
+        if jet_label:
+            nx.draw_networkx_labels(g, pos=pos,labels=jl,verticalalignment='bottom')
 
+        
+        
         
         
 ################################################          
