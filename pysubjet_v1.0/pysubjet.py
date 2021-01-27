@@ -155,18 +155,101 @@ def decluster(jet,jet_label=None,node_feature=None,node_label=None,R=1.0,p=0,dir
         return None
 
 
+
+
+
+
+# older function... deprecated
+def decluster_jet(jets, 
+                  node_feature=None, 
+                  decluster_algorithm='c/a', 
+                  R=1.0,
+                  jet_ordering='pt',
+                  label=None):
+        
+    '''
+    Reclusters constituents of a jets then extracts then de-clusteres to recover 
+    the recombaination binary tree of each jet. Features are computed and extracted
+    at each declustering. 
+    
+    ouput: list of binary trees as networkx graph objects with node attributes.
+    
+    '''
+
+    jet_trees=[]
+    
+    for n,jet in enumerate(jets):
+        bit='1'
+        tree={}
+        if len(jet.constituents_array())>1:
+            clustered_jet = cluster(jet.constituents_array(), R=R, p=exponent(decluster_algorithm))
+            tree[bit]=jet
+            jet_tree=nx.Graph()
+            jet_tree.add_node(1, njet=n, label=label, pseudojet=jet , primary_branch=True)
+            t_max=len(jet)+1
+            for t in range(2,t_max):
+                subjets_0  = clustered_jet.exclusive_jets(t-1)
+                subjets_12 = clustered_jet.exclusive_jets(t)
+                d=[]
+                for i in subjets_0:
+                    if i not in subjets_12:
+                        d.append(i)
+                        break
+                for i in subjets_12:
+                    if i not in subjets_0: d.append(i)
+                
+                if len(d)==3: 
+                    mother,hard,soft=d[0],d[1],d[2]
+                else: 
+                    #print('warning: mother subjet without daughter(s)!')
+                    continue
+                    
+                if len(tree)>0:
+                    for i in tree.keys():
+                        if tree[i]==d[0]: bit=str(i)
+                m=bit
+                h=bit+'0'; tree[h]=d[1]
+                s=bit+'1'; tree[s]=d[2]
+                
+                if not int(h[1:]): 
+                    primary_branch=True
+                else: 
+                    primary_branch=False
+                    
+                if node_feature: 
+                    nf=node_feature(mother,hard,soft)
+                else: 
+                    nf=None
+                    
+                jet_tree.add_node(int(m,2), pseudojet=mother, feature=nf)
+                jet_tree.add_node(int(s,2), pseudojet=soft, feature=None, primary_branch=False)
+                jet_tree.add_node(int(h,2), pseudojet=hard, feature=None, primary_branch=primary_branch)
+                jet_tree.add_edge(int(m,2), int(s,2), weight=soft.pt/jet.pt)
+                jet_tree.add_edge(int(m,2), int(h,2), weight=hard.pt/jet.pt)
+
+            jet_trees.append(jet_tree)                    
+        if jet_ordering=='mass': jet_trees.sort(key=lambda x:x.nodes(data=True)[1]['pseudojet'].mass, reverse=True)
+        elif jet_ordering=='pt': jet_trees.sort(key=lambda x:x.nodes(data=True)[1]['pseudojet'].pt, reverse=True)
+        for n,jet in enumerate(jet_trees): jet.nodes(data=True)[1]['j']=n  # update Njet label to match ordering
+            
+    return jet_trees
+
+
+
+
+
 class cluster_events(object):
 
     def __init__(self, 
                  data,
+                 p=-1, 
                  R=1.0, 
-                 p=20.0,
-                 ptmin=0.0,
+                 ptmin=20.0,
                  stop=None
                  ):
         
         self.data=data
-        self.p=p
+        self.p=c
         self.R=R
         self.ptmin=ptmin
         self.stop=stop
@@ -199,6 +282,7 @@ class cluster_events(object):
             
     def __exit__(self, exc_type, exc_value, traceback):
         pass
+
 
 
 def hierarchy_pos(G, root=None, width=1., vert_gap = 0.2, vert_loc = 0, xcenter = 0.5):
